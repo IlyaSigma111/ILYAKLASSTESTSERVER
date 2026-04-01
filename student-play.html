@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Режим ученика - Викторина</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        .game-container {
+            max-width: 700px;
+            width: 100%;
+            background: rgba(255,255,255,0.95);
+            border-radius: 48px;
+            padding: 40px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.2);
+            color: #0f172a;
+        }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+        .back-btn {
+            padding: 10px 20px;
+            background: #f1f5f9;
+            border: none;
+            border-radius: 100px;
+            cursor: pointer;
+            text-decoration: none;
+            color: #475569;
+            font-weight: 500;
+        }
+        .quiz-title {
+            font-weight: 700;
+            font-size: 18px;
+        }
+        .score {
+            background: #10b981;
+            padding: 8px 20px;
+            border-radius: 100px;
+            color: white;
+            font-weight: 700;
+        }
+        
+        /* Join Screen */
+        .join-screen {
+            text-align: center;
+        }
+        .code-input {
+            width: 100%;
+            max-width: 300px;
+            padding: 16px;
+            font-size: 24px;
+            text-align: center;
+            letter-spacing: 4px;
+            border: 2px solid #e2e8f0;
+            border-radius: 60px;
+            margin: 20px 0;
+            font-family: monospace;
+        }
+        .name-input {
+            width: 100%;
+            padding: 14px;
+            font-size: 18px;
+            border: 2px solid #e2e8f0;
+            border-radius: 60px;
+            margin: 10px 0;
+        }
+        .join-btn {
+            width: 100%;
+            padding: 16px;
+            background: #10b981;
+            color: white;
+            border: none;
+            border-radius: 60px;
+            font-size: 18px;
+            font-weight: 700;
+            cursor: pointer;
+        }
+        
+        /* Question Screen */
+        .question-text {
+            font-size: 24px;
+            margin: 30px 0;
+            text-align: center;
+            line-height: 1.4;
+            background: #f8fafc;
+            padding: 30px;
+            border-radius: 32px;
+            font-weight: 500;
+        }
+        .options-grid {
+            display: grid;
+            gap: 12px;
+            margin: 30px 0;
+        }
+        .option {
+            background: #f1f5f9;
+            border: 2px solid #e2e8f0;
+            border-radius: 100px;
+            padding: 16px 24px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            transition: all 0.2s;
+            font-weight: 500;
+        }
+        .option:hover {
+            background: #e2e8f0;
+            transform: translateX(4px);
+        }
+        .option.selected {
+            background: #10b981;
+            color: white;
+            border-color: #10b981;
+        }
+        .option-letter {
+            width: 36px;
+            height: 36px;
+            background: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            color: #0f172a;
+        }
+        .status-message {
+            text-align: center;
+            padding: 12px;
+            border-radius: 100px;
+            margin: 20px 0;
+            font-weight: 500;
+        }
+        .status-correct {
+            background: #d1fae5;
+            color: #065f46;
+        }
+        .status-wrong {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+        
+        /* Waiting Screen */
+        .waiting-screen {
+            text-align: center;
+            padding: 40px;
+        }
+        .loader {
+            width: 48px;
+            height: 48px;
+            border: 3px solid #e2e8f0;
+            border-top: 3px solid #6366f1;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        /* Results */
+        .final-score {
+            font-size: 64px;
+            font-weight: 800;
+            color: #10b981;
+            margin: 30px 0;
+            text-align: center;
+        }
+        
+        @media (max-width: 768px) {
+            .game-container { padding: 24px; }
+            .question-text { font-size: 18px; padding: 20px; }
+            .option { padding: 12px 20px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container" id="gameContainer"></div>
+
+    <script>
+        const SB_URL = 'https://sekiunglzxycjkgraudd.supabase.co';
+        const SB_KEY = 'sb_publishable_k5F_fZwKqsbwpO-itXvT9Q_UhRc6svh';
+        const sb = window.supabase.createClient(SB_URL, SB_KEY);
+
+        const urlParams = new URLSearchParams(window.location.search);
+        const directQuizId = urlParams.get('quiz');
+
+        let currentLobby = null;
+        let playerName = localStorage.getItem('studentName') || '';
+        let myScore = 0;
+        let hasAnswered = false;
+        let currentQuestionIndex = -1;
+        let channel = null;
+
+        if (directQuizId) {
+            showJoinScreen();
+        } else {
+            showJoinScreen();
+        }
+        
+        function showJoinScreen() {
+            document.getElementById('gameContainer').innerHTML = `
+                <div class="join-screen">
+                    <h2 style="margin-bottom: 20px;">🎮 Вход в игру</h2>
+                    ${!directQuizId ? `
+                        <div>
+                            <label style="display:block; margin-bottom:8px;">📱 Код игры</label>
+                            <input type="text" id="gameCode" class="code-input" placeholder="00000000" maxlength="8">
+                        </div>
+                    ` : ''}
+                    <div style="margin-top: 20px;">
+                        <label style="display:block; margin-bottom:8px;">👤 Ваше имя</label>
+                        <input type="text" id="playerNameInput" class="name-input" placeholder="Введите ваше имя" value="${escapeHtml(playerName)}">
+                    </div>
+                    <button class="join-btn" onclick="joinGame()">🔌 Подключиться к игре</button>
+                    <div id="errorMsg" style="color:#ef4444; margin-top:15px;"></div>
+                    <a href="index.html" style="display:inline-block; margin-top:20px; color:#6366f1;">← На главную</a>
+                </div>
+            `;
+        }
+        
+        window.joinGame = async function() {
+            const name = document.getElementById('playerNameInput').value.trim();
+            if (!name) {
+                document.getElementById('errorMsg').textContent = 'Введите ваше имя';
+                return;
+            }
+            playerName = name;
+            localStorage.setItem('studentName', playerName);
+            
+            let lobbyCode;
+            if (directQuizId) {
+                // Если перешли напрямую по ссылке, создаем лобби
+                const { data: lobbies } = await sb.from('lobbies').select('*').eq('quiz_id', directQuizId).eq('status', 'waiting');
+                if (lobbies && lobbies.length > 0) {
+                    lobbyCode = lobbies[0].code;
+                } else {
+                    document.getElementById('errorMsg').textContent = 'Нет активной игры для этой викторины';
+                    return;
+                }
+            } else {
+                lobbyCode = document.getElementById('gameCode').value.trim();
+                if (!lobbyCode || lobbyCode.length !== 8) {
+                    document.getElementById('errorMsg').textContent = 'Введите 8-значный код игры';
+                    return;
+                }
+            }
+            
+            try {
+                const { data: lobbies } = await sb.from('lobbies').select('*').eq('code', lobbyCode).in('status', ['waiting', 'active']);
+                if (!lobbies || lobbies.length === 0) {
+                    document.getElementById('errorMsg').textContent = 'Игра с таким кодом не найдена';
+                    return;
+                }
+                
+                currentLobby = lobbies[0];
+                const players = currentLobby.players || {};
+                
+                if (players[name]) {
+                    document.getElementById('errorMsg').textContent = 'Игрок с таким именем уже есть';
+                    return;
+                }
+                
+                players[name] = { name, score: 0, joined_at: Date.now() };
+                await sb.from('lobbies').update({ players }).eq('id', currentLobby.id);
+                
+                startGame();
+                listenToLobby();
+                
+            } catch (error) {
+                document.getElementById('errorMsg').textContent = 'Ошибка подключения';
+            }
+        };
+        
+        function startGame() {
+            document.getElementById('gameContainer').innerHTML = `
+                <div class="waiting-screen">
+                    <div class="loader"></div>
+                    <h3>Ожидание начала игры...</h3>
+                    <div style="margin-top: 20px;" id="waitingPlayersList"></div>
+                    <div class="score" id="scoreDisplay" style="display: inline-block; margin-top: 20px;">0 очков</div>
+                </div>
+            `;
+            updateWaitingPlayers();
+        }
+        
+        function listenToLobby() {
+            if (channel) sb.removeChannel(channel);
+            
+            channel = sb.channel('lobby-student-' + currentLobby.id)
+                .on('postgres_changes', {
+                    event: '*',
+                    schema: 'public',
+                    table: 'lobbies',
+                    filter: `id=eq.${currentLobby.id}`
+                }, payload => {
+                    if (payload.new) handleLobbyUpdate(payload.new);
+                })
+                .subscribe();
+        }
+        
+        function handleLobbyUpdate(lobby) {
+            currentLobby = lobby;
+            updateWaitingPlayers();
+            
+            if (lobby.status === 'active') {
+                const qIndex = lobby.current_question || 0;
+                if (qIndex !== currentQuestionIndex) {
+                    currentQuestionIndex = qIndex;
+                    showQuestion(lobby);
+                }
+            } else if (lobby.status === 'finished') {
+                showResults();
+            }
+        }
+        
+        function updateWaitingPlayers() {
+            const players = currentLobby?.players || {};
+            const container = document.getElementById('waitingPlayersList');
+            if (container) {
+                const list = Object.values(players).map(p => `
+                    <div style="background:rgba(255,255,255,0.1); padding:8px 16px; border-radius:30px; display:inline-block; margin:5px;">
+                        <i class="fas fa-user"></i> ${escapeHtml(p.name)}
+                    </div>
+                `).join('');
+                container.innerHTML = `<div style="margin-top:20px;">Игроки: ${list || 'Ожидание...'}</div>`;
+            }
+        }
+        
+        function showQuestion(lobby) {
+            hasAnswered = false;
+            
+            const qText = lobby.question_text || 'Загрузка вопроса...';
+            const answers = lobby.question_answers || ['', '', '', ''];
+            
+            document.getElementById('gameContainer').innerHTML = `
+                <div class="header">
+                    <a href="index.html" class="back-btn">← Выход</a>
+                    <div class="quiz-title">${escapeHtml(lobby.quiz_title || 'Викторина')}</div>
+                    <div class="score" id="scoreDisplay">${myScore} очков</div>
+                </div>
+                <div class="question-text">${escapeHtml(qText)}</div>
+                <div class="options-grid" id="optionsGrid">
+                    ${answers.map((ans, i) => `
+                        <div class="option" onclick="selectAnswer(${i})">
+                            <div class="option-letter">${String.fromCharCode(65 + i)}</div>
+                            <div>${escapeHtml(ans)}</div>
+                        </div>
+                    `).join('')}
+                </div>
+                <div id="statusMessage" class="status-message">Выберите ответ</div>
+            `;
+        }
+        
+        window.selectAnswer = async function(selected) {
+            if (hasAnswered) return;
+            hasAnswered = true;
+            
+            const players = currentLobby.players || {};
+            const myPlayer = players[playerName];
+            
+            if (!myPlayer) return;
+            
+            const isCorrect = (selected === (currentLobby.correct_answer || 0));
+            
+            const statusDiv = document.getElementById('statusMessage');
+            if (isCorrect) {
+                myScore++;
+                statusDiv.className = 'status-message status-correct';
+                statusDiv.textContent = '✅ Правильно! +1 очко';
+                document.getElementById('scoreDisplay').textContent = myScore;
+            } else {
+                statusDiv.className = 'status-message status-wrong';
+                statusDiv.textContent = '❌ Неправильно!';
+            }
+            
+            // Обновляем счет в лобби
+            myPlayer.score = myScore;
+            await sb.from('lobbies').update({ players }).eq('id', currentLobby.id);
+            
+            // Блокируем дальнейшие ответы на этот вопрос
+            const options = document.querySelectorAll('.option');
+            options.forEach(opt => opt.style.opacity = '0.5');
+        };
+        
+        function showResults() {
+            document.getElementById('gameContainer').innerHTML = `
+                <div style="text-align:center;">
+                    <h2>🎉 Викторина завершена!</h2>
+                    <div class="final-score">${myScore}</div>
+                    <div style="margin: 20px 0;">Ваш результат: ${myScore} очков</div>
+                    <div id="finalPlayersList"></div>
+                    <a href="index.html" class="back-btn" style="display: inline-block; margin-top: 20px;">🏠 На главную</a>
+                </div>
+            `;
+            
+            const players = Object.values(currentLobby?.players || {});
+            players.sort((a,b) => (b.score || 0) - (a.score || 0));
+            
+            document.getElementById('finalPlayersList').innerHTML = `
+                <h3>Рейтинг игроков</h3>
+                ${players.map(p => `
+                    <div style="display:flex; justify-content:space-between; background:rgba(0,0,0,0.05); padding:10px 20px; margin:5px 0; border-radius:30px;">
+                        <span><i class="fas fa-user"></i> ${escapeHtml(p.name)}</span>
+                        <span style="font-weight:700;">${p.score || 0}</span>
+                    </div>
+                `).join('')}
+            `;
+        }
+        
+        function escapeHtml(str) {
+            if (!str) return '';
+            return str.replace(/[&<>]/g, function(m) {
+                if (m === '&') return '&amp;';
+                if (m === '<') return '&lt;';
+                if (m === '>') return '&gt;';
+                return m;
+            });
+        }
+    </script>
+</body>
+</html>
